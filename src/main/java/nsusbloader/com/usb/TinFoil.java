@@ -108,6 +108,13 @@ class TinFoil extends TransferModule {
                 if (isInvalidReply(deviceReply))
                     continue;
 
+                if (deviceReply[5] != 0x01 && deviceReply[8] == 0x00)
+                {
+                    print("Transfer complete", PASS);
+                    status = EFileStatus.UPLOADED;
+                    return;
+                }
+
                 switch (deviceReply[8]){
                     case CMD_EXIT:
                         print("Transfer complete", PASS);
