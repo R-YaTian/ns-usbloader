@@ -51,7 +51,7 @@ class TinFoil extends TransferModule {
     private static final byte[] TWELVE_ZERO_BYTES = new byte[12];
     private static final byte[] PADDING = new byte[8];
 
-    private static final byte CMD_EXIT = 0x0F;
+    private static final byte CMD_EXIT = 0x00;
     private static final byte CMD_FILE_RANGE_DEFAULT = 0x01;
     private static final byte CMD_FILE_RANGE_ALTERNATIVE = 0x02;
 
@@ -67,12 +67,58 @@ class TinFoil extends TransferModule {
     private void workLoop(){
         try {
             sendListOfFiles();
+            // Drain any residual data on IN endpoint before processing commands
+            drainUsbInput();
             proceedCommands();
         }
         catch (Exception e){
             e.printStackTrace();
         }
     }
+
+    /**
+     * Try to quickly read and discard any residual data from the device IN endpoint.
+     * This uses a short timeout and stops after a few consecutive timeouts.
+     */
+    private void drainUsbInput() throws Exception {
+        print("Draining residual USB IN data", INFO);
+
+        var readBuffer = ByteBuffer.allocateDirect(512);
+        var rBufferTransferred = IntBuffer.allocate(1);
+
+        int consecutiveTimeouts = 0;
+        final int maxConsecutiveTimeouts = 3;
+
+        while (! task.isCancelled()) {
+            readBuffer.clear();
+
+            int result = LibUsb.bulkTransfer(handlerNS,
+                    IN_EP,
+                    readBuffer,
+                    rBufferTransferred,
+                    100); // short timeout to quickly probe for data
+
+            switch (result) {
+                case LibUsb.SUCCESS:
+                    consecutiveTimeouts = 0;
+                    var receivedBytes = new byte[rBufferTransferred.get()];
+                    readBuffer.get(receivedBytes);
+                    // Discard data. Keep a minimal log for debugging.
+                    print("Drained " + receivedBytes.length + " bytes from IN endpoint", INFO);
+                    continue;
+                case LibUsb.ERROR_TIMEOUT:
+                    consecutiveTimeouts++;
+                    if (consecutiveTimeouts >= maxConsecutiveTimeouts)
+                        return; // assume no more residual data
+                    continue;
+                default:
+                    print("Error while draining USB IN: " + LibUsb.errorName(result), INFO);
+                    return;
+            }
+        }
+        throw new InterruptedException("Execution interrupted");
+    }
+
     /**
      * Send what NSP will be transferred
      * */
@@ -107,13 +153,6 @@ class TinFoil extends TransferModule {
 
                 if (isInvalidReply(deviceReply))
                     continue;
-
-                if (deviceReply[5] != 0x01 && deviceReply[8] == 0x00)
-                {
-                    print("Transfer complete", PASS);
-                    status = EFileStatus.UPLOADED;
-                    return;
-                }
 
                 switch (deviceReply[8]){
                     case CMD_EXIT:
