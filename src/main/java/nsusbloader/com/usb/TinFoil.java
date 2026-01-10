@@ -51,7 +51,7 @@ class TinFoil extends TransferModule {
     private static final byte[] TWELVE_ZERO_BYTES = new byte[12];
     private static final byte[] PADDING = new byte[8];
 
-    private static final byte CMD_EXIT = 0x0F;
+    private static final byte CMD_EXIT = 0x00;
     private static final byte CMD_FILE_RANGE_DEFAULT = 0x01;
     private static final byte CMD_FILE_RANGE_ALTERNATIVE = 0x02;
 
@@ -109,10 +109,6 @@ class TinFoil extends TransferModule {
                     continue;
 
                 switch (deviceReply[8]){
-                    case CMD_EXIT:
-                        print("Transfer complete", PASS);
-                        status = EFileStatus.UPLOADED;
-                        return;
                     case CMD_FILE_RANGE_DEFAULT:
                     case CMD_FILE_RANGE_ALTERNATIVE:
                         fileRangeCmd();
