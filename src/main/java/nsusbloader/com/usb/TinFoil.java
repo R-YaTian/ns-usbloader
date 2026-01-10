@@ -109,10 +109,6 @@ class TinFoil extends TransferModule {
                     continue;
 
                 switch (deviceReply[8]){
-                    case CMD_EXIT:
-                        print("Transfer complete", PASS);
-                        status = EFileStatus.UPLOADED;
-                        return;
                     case CMD_FILE_RANGE_DEFAULT:
                     case CMD_FILE_RANGE_ALTERNATIVE:
                         fileRangeCmd();
